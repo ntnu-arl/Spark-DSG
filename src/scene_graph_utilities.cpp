@@ -35,28 +35,31 @@
 #include "spark_dsg/scene_graph_utilities.h"
 
 #include "spark_dsg/bounding_box_extraction.h"
+#include "spark_dsg/dynamic_scene_graph.h"
 
 namespace spark_dsg {
 
-void getAncestorsOfLayer(const DynamicSceneGraph& graph,
-                         NodeId parent,
-                         LayerKey child_layer,
-                         const SgNodeCallback& callback) {
+using Callback = std::function<void(const DynamicSceneGraph&, const NodeId)>;
+
+void getNodeAncestorsAtDepth(const DynamicSceneGraph& graph,
+                             NodeId parent,
+                             size_t depth,
+                             const Callback& callback) {
+  if (!depth) {
+    return;
+  }
+
   const auto node = graph.findNode(parent);
   if (!node) {
     return;
   }
 
-  if (node->layer <= child_layer) {
-    return;
-  }
-
   for (const auto& child : node->children()) {
-    const auto layer_key = *graph.getLayerForNode(child);
-    if (layer_key == child_layer) {
+    // technically we can't recurse with depth=0 and hit this point
+    if (depth == 1) {
       callback(graph, child);
     } else {
-      getAncestorsOfLayer(graph, child, child_layer, callback);
+      getNodeAncestorsAtDepth(graph, child, depth - 1, callback);
     }
   }
 }
@@ -84,15 +87,15 @@ struct NodeAdaptor : public bounding_box::PointAdaptor {
 
 BoundingBox computeAncestorBoundingBox(const DynamicSceneGraph& graph,
                                        NodeId parent,
-                                       LayerId child_layer,
+                                       size_t depth,
                                        BoundingBox::Type bbox_type) {
   NodeAdaptor adaptor(&graph);
-  getAncestorsOfLayer(graph,
-                      parent,
-                      child_layer,
-                      [&adaptor](const DynamicSceneGraph&, const NodeId ancestor) {
-                        adaptor.add(ancestor);
-                      });
+  getNodeAncestorsAtDepth(graph,
+                          parent,
+                          depth,
+                          [&adaptor](const DynamicSceneGraph&, const NodeId ancestor) {
+                            adaptor.add(ancestor);
+                          });
 
   return bounding_box::extract(adaptor, bbox_type);
 }

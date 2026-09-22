@@ -33,7 +33,9 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include "spark_dsg/dynamic_scene_graph.h"
+#include <string>
+
+#include "spark_dsg/spark_dsg_fwd.h"
 
 namespace spark_dsg::io::json {
 
@@ -49,6 +51,6 @@ std::string writeGraph(const DynamicSceneGraph& graph, bool include_mesh = false
  * @param contents JSON string to parse
  * @returns Resulting parsed scene graph
  */
-DynamicSceneGraph::Ptr readGraph(const std::string& contents);
+std::shared_ptr<DynamicSceneGraph> readGraph(const std::string& contents);
 
 }  // namespace spark_dsg::io::json

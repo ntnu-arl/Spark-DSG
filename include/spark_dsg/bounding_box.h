@@ -35,9 +35,8 @@
 #pragma once
 
 #include <Eigen/Geometry>
-#include <iostream>
 
-#include "spark_dsg/mesh.h"
+#include "spark_dsg/spark_dsg_fwd.h"
 
 namespace spark_dsg {
 
@@ -210,9 +209,25 @@ struct BoundingBox {
 
   /**
    * @brief Compute the intersection over union (IoU) of this bounding box with another.
-   * @note Currently only supports AABB-AABB intersection.
+   * @note Currently only supports exact computation for AABB-AABB intersection.
+   * @param other Other bounding box to use for computation
+   * @param samples Number of random samples to draw to estimate intersection
+   * @param force_approx Use sampling-based method for all bounding box types
    */
-  float computeIoU(const BoundingBox& other) const;
+  float computeIoU(const BoundingBox& other, size_t samples = 1000) const;
+
+  /**
+   * @brief Compute IoU of two bounding boxes by sampling
+   * @param other Other bounding box to compute metric for
+   * @param samples Number of random samples to draw for estimation
+   */
+  float computeIoUApprox(const BoundingBox& other, size_t samples = 1000) const;
+
+  /**
+   * @brief Transform the bounding box.
+   * @param transform The transform to apply.
+   */
+  void transform(const Eigen::Isometry3d& transform);
 
   /**
    * @brief output bounding box information
@@ -248,11 +263,12 @@ struct BoundingBox {
   Eigen::Vector3f minCorner() const;
   Eigen::Vector3f maxCorner() const;
 
+  float computeIoUExact(const BoundingBox& other) const;
+
  public:
   // Specialized point adaptors.
   struct MeshAdaptor : PointAdaptor {
-    MeshAdaptor(const Mesh& mesh, const std::vector<size_t>* indices = nullptr)
-        : mesh(mesh), indices(indices) {}
+    MeshAdaptor(const Mesh& mesh, const std::vector<size_t>* indices = nullptr);
     size_t size() const override;
     Eigen::Vector3f get(size_t index) const override;
     const Mesh& mesh;
@@ -260,7 +276,7 @@ struct BoundingBox {
   };
 
   struct PointVectorAdaptor : PointAdaptor {
-    PointVectorAdaptor(const std::vector<Eigen::Vector3f>& points) : points(points) {}
+    PointVectorAdaptor(const std::vector<Eigen::Vector3f>& points);
     size_t size() const override;
     Eigen::Vector3f get(size_t index) const override;
     const std::vector<Eigen::Vector3f>& points;

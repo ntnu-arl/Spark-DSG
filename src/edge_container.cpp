@@ -34,18 +34,23 @@
  * -------------------------------------------------------------------------- */
 #include "spark_dsg/edge_container.h"
 
+#include "spark_dsg/edge_attributes.h"
+#include "spark_dsg/node_symbol.h"
+
 namespace spark_dsg {
 
 using Edge = EdgeContainer::Edge;
 
-SceneGraphEdge::SceneGraphEdge(NodeId source, NodeId target, AttrPtr&& info)
+SceneGraphEdge::SceneGraphEdge(NodeId source,
+                               NodeId target,
+                               std::unique_ptr<EdgeAttributes>&& info)
     : source(source), target(target), info(std::move(info)) {}
 
 SceneGraphEdge::~SceneGraphEdge() = default;
 
 void EdgeContainer::insert(NodeId source,
                            NodeId target,
-                           EdgeAttributes::Ptr&& edge_info) {
+                           std::unique_ptr<EdgeAttributes>&& edge_info) {
   auto attrs = (edge_info == nullptr) ? std::make_unique<EdgeAttributes>()
                                       : std::move(edge_info);
 
@@ -103,7 +108,7 @@ Edge* EdgeContainer::find(NodeId source, NodeId target) {
   return find(key);
 }
 
-void EdgeContainer::getNew(std::vector<EdgeKey>& new_edges, bool clear_new) {
+void EdgeContainer::getNew(std::vector<EdgeKey>& new_edges, bool clear_new) const {
   auto iter = edge_status.begin();
   while (iter != edge_status.end()) {
     if (iter->second == EdgeStatus::NEW) {
@@ -118,7 +123,7 @@ void EdgeContainer::getNew(std::vector<EdgeKey>& new_edges, bool clear_new) {
 }
 
 void EdgeContainer::getRemoved(std::vector<EdgeKey>& removed_edges,
-                               bool clear_removed) {
+                               bool clear_removed) const {
   auto iter = edge_status.begin();
   while (iter != edge_status.end()) {
     if (iter->second != EdgeStatus::DELETED) {
@@ -151,6 +156,5 @@ Edge* EdgeContainer::find(const EdgeKey& key) const {
   stale_edges[key] = false;
   return const_cast<SceneGraphEdge*>(&iter->second);
 }
-
 
 }  // namespace spark_dsg

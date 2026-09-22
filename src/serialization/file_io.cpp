@@ -38,7 +38,6 @@
 #include <fstream>
 #include <sstream>
 
-#include "spark_dsg/dynamic_scene_graph.h"
 #include "spark_dsg/logging.h"
 #include "spark_dsg/serialization/graph_binary_serialization.h"
 #include "spark_dsg/serialization/graph_json_serialization.h"
@@ -46,7 +45,7 @@
 
 namespace spark_dsg::io {
 
-FileType identifyFileType(const std::string& filepath) {
+FileType identifyFileType(const std::filesystem::path& filepath) {
   const auto ext = std::filesystem::path(filepath).extension().string();
   if (ext.empty()) {
     return FileType::NONE;
@@ -58,7 +57,7 @@ FileType identifyFileType(const std::string& filepath) {
   return FileType::UNKNOWN;
 }
 
-FileType verifyFileExtension(std::string& filepath) {
+FileType verifyFileExtension(std::filesystem::path& filepath) {
   io::FileType type = io::identifyFileType(filepath);
 
   // If no file extension is provided, default to binary.
@@ -80,7 +79,7 @@ FileType verifyFileExtension(std::string& filepath) {
 }
 
 void saveDsgBinary(const DynamicSceneGraph& graph,
-                   const std::string& filepath,
+                   const std::filesystem::path& filepath,
                    bool include_mesh) {
   // Get the header data.
   const FileHeader header = FileHeader::current();
@@ -96,7 +95,8 @@ void saveDsgBinary(const DynamicSceneGraph& graph,
   out.write(reinterpret_cast<const char*>(graph_buffer.data()), graph_buffer.size());
 }
 
-DynamicSceneGraph::Ptr loadDsgBinary(const std::string& filepath) {
+std::shared_ptr<DynamicSceneGraph> loadDsgBinary(
+    const std::filesystem::path& filepath) {
   // Read the file into a buffer.
   std::ifstream infile(filepath, std::ios::in | std::ios::binary);
   std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(infile)),
@@ -116,13 +116,13 @@ DynamicSceneGraph::Ptr loadDsgBinary(const std::string& filepath) {
 }
 
 void saveDsgJson(const DynamicSceneGraph& graph,
-                 const std::string& filepath,
+                 const std::filesystem::path& filepath,
                  bool include_mesh) {
   std::ofstream outfile(filepath);
   outfile << json::writeGraph(graph, include_mesh);
 }
 
-DynamicSceneGraph::Ptr loadDsgJson(const std::string& filepath) {
+std::shared_ptr<DynamicSceneGraph> loadDsgJson(const std::filesystem::path& filepath) {
   std::ifstream infile(filepath);
   std::stringstream ss;
   ss << infile.rdbuf();

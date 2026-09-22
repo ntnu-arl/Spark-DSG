@@ -37,7 +37,9 @@
 #include <Eigen/Dense>
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
+#include <optional>
 #include <unordered_set>
 #include <vector>
 
@@ -53,15 +55,21 @@ class Mesh {
   using Face = std::array<size_t, 3>;
   using Timestamp = uint64_t;
   using Label = uint32_t;
+  using SemanticFeature = std::optional<Eigen::VectorXf>;
+  using PanopticID = std::optional<uint16_t>;
   using Positions = std::vector<Pos>;
   using Colors = std::vector<Color>;
   using Timestamps = std::vector<Timestamp>;
   using Labels = std::vector<Label>;
+  using SemanticFeatures = std::vector<SemanticFeature>;
+  using PanopticIDs = std::vector<PanopticID>;
   using Faces = std::vector<Face>;
 
   Mesh(bool has_colors = true,
        bool has_timestamps = true,
        bool has_labels = true,
+       bool has_semantic_features = true,
+       bool has_panoptic_ids = true,
        bool has_first_seen_stamps = false);
 
   Mesh(const Mesh& other) = default;
@@ -93,6 +101,12 @@ class Mesh {
    * @brief Get total number of vertices
    */
   size_t numFaces() const;
+
+  /**
+   * @brief Reserve vertices memory
+   * @param size New expected size of mesh vertices
+   */
+  void reserveVertices(size_t size);
 
   /**
    * @brief Set mesh vertex size
@@ -163,6 +177,26 @@ class Mesh {
   void setLabel(size_t index, Label label);
 
   /**
+   * @brief Get current semantic feature
+   */
+  const SemanticFeature& semanticFeature(size_t index) const;
+
+  /**
+   * @brief Set current semantic feature
+   */
+  void setSemanticFeature(size_t index, const SemanticFeature& feature);
+
+  /**
+   * @brief Get current panoptic id
+   */
+  const PanopticID& panopticID(size_t index) const;
+
+  /**
+   * @brief Set current panoptic id
+   */
+  void setPanopticID(size_t index, const PanopticID& panoptic_id);
+
+  /**
    * @brief Get a face
    */
   const Face& face(size_t index) const;
@@ -206,14 +240,14 @@ class Mesh {
    *
    * @param filepath Filepath to save graph to.
    */
-  void save(std::string filepath) const;
+  void save(std::filesystem::path filepath) const;
 
   /**
    * @brief parse mesh from binary or JSON file
    * @param filepath Complete path to file to read, including extension.
    * @returns Resulting parsed mesh
    */
-  static Ptr load(std::string filepath);
+  static Ptr load(std::filesystem::path filepath);
 
   // ------ Modification ------
 
@@ -242,16 +276,41 @@ class Mesh {
    */
   void transform(const Eigen::Isometry3f& transform);
 
+  /**
+   * @brief Append the other mesh to this one
+   * @param other Mesh to append to the current mesh
+   * @note Fails when the available fields don't match
+   * @returns Whether the append was possible
+   */
+  bool append(const Mesh& other);
+
+  /**
+   * @brief append the mesh on the right hand side to this one
+   * @param other Mesh to append to the current mesh
+   * @note Silently fails to append the other mesh if the available fields don't match
+   * @returns The current mesh
+   */
+  Mesh& operator+=(const Mesh& other);
+
+  /**
+   * @brief Get memory size
+   */
+  size_t totalBytes() const;
+
  public:
   const bool has_colors;
   const bool has_timestamps;
   const bool has_labels;
+  const bool has_semantic_features;
+  const bool has_panoptic_ids;
   const bool has_first_seen_stamps;
   Positions points;
   Colors colors;
   Timestamps stamps;
   Timestamps first_seen_stamps;
   Labels labels;
+  SemanticFeatures semantic_features;
+  PanopticIDs panoptic_ids;
   Faces faces;
 };
 

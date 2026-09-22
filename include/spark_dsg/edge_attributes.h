@@ -36,6 +36,7 @@
 #include <memory>
 #include <ostream>
 
+#include "spark_dsg/metadata.h"
 #include "spark_dsg/serialization/attribute_registry.h"
 
 namespace spark_dsg {
@@ -76,6 +77,8 @@ struct EdgeAttributes {
   bool weighted;
   //! the weight of the edge
   double weight;
+  //! Arbitrary metadata about the edge
+  Metadata metadata;
 
   /**
    * @brief output attribute information

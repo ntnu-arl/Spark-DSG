@@ -34,8 +34,8 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 
-#include "spark_dsg/serialization/file_io.h"
 #include "spark_dsg/serialization/versioning.h"
+#include "spark_dsg/spark_dsg.h"
 #include "spark_dsg_tests/temp_file.h"
 #include "spark_dsg_tests/type_comparisons.h"
 
@@ -63,7 +63,7 @@ TEST(FileIoTests, VersionSerialization) {
 
   // Check deserialization.
   const auto result = FileHeader::deserializeFromBinary(buffer);
-  EXPECT_TRUE(result.has_value());
+  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(header.project_name, result->project_name);
   EXPECT_EQ(header.version, result->version);
 
@@ -78,9 +78,8 @@ TEST(FileIoTests, VersionSerialization) {
 
 void testSaveLoad(const std::string& file_name) {
   DynamicSceneGraph graph;
-  graph.emplaceNode(DsgLayers::PLACES,
-                    NodeSymbol('p', 0),
-                    std::make_unique<NodeAttributes>(Eigen::Vector3d::Zero()));
+  graph.emplaceNode(
+      2, NodeSymbol('p', 0), std::make_unique<NodeAttributes>(Eigen::Vector3d::Zero()));
   graph.setMesh(std::make_shared<Mesh>());
   graph.save(file_name);
   auto other = DynamicSceneGraph::load(file_name);

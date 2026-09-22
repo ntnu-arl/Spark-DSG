@@ -33,9 +33,6 @@
  * purposes notwithstanding any copyright notation herein.
  * -------------------------------------------------------------------------- */
 #pragma once
-#include <ostream>
-#include <sstream>
-
 #include "spark_dsg/scene_graph_types.h"
 
 namespace spark_dsg {
@@ -59,39 +56,33 @@ class NodeSymbol {
   NodeSymbol(NodeId value);
 
   //! cast the symobl directly to a node ID
-  inline operator NodeId() const { return value_.value; }
+  operator NodeId() const;
 
   /**
    * @brief Get the index of the node in the specific category
    * @returns x where (_, x) were the arguments to create the symbol
    */
-  inline NodeId categoryId() const { return value_.symbol.index; }
+  NodeId categoryId() const;
+
+  const NodeId& value() const { return value_.value; }
 
   /**
    * @brief Get the category of the node
    * @returns c where (c, _) were the arguments to create the symbol
    */
-  inline char category() const { return value_.symbol.key; }
+  char category() const;
 
   //! pre-increment the index portion of the symbol
-  NodeSymbol& operator++() {
-    value_.symbol.index++;
-    return *this;
-  }
+  NodeSymbol& operator++();
 
   //! post-increment the index portion of the symbol
-  NodeSymbol operator++(int) {
-    NodeSymbol old = *this;
-    value_.symbol.index++;
-    return old;
-  }
+  NodeSymbol operator++(int);
 
   //! get a string representation of the symbol
-  inline std::string getLabel() const {
-    std::stringstream ss;
-    ss << *this;
-    return ss.str();
-  }
+  [[deprecated("use str() instead")]] std::string getLabel() const;
+
+  //! get a string representation of the symbol
+  std::string str(bool literal = false) const;
 
   /**
    * @brief output node symbol information
@@ -104,38 +95,15 @@ class NodeSymbol {
  private:
   union {
     NodeId value;
-    struct __attribute__((packed)) {
+#pragma pack(push, 1)
+    struct {
       NodeId index : 56;
       char key : 8;
     } symbol;
+#pragma pack(pop)
   } value_;
 };
 
-inline NodeSymbol operator"" _id(const char* str, size_t size) {
-  if (size < 1) {
-    throw std::domain_error("invalid literal: must have at least two characters");
-  }
-
-  char prefix = str[0];
-  std::string number(str + 1, size - 1);
-  size_t index = std::stoull(number);
-  return NodeSymbol(prefix, index);
-}
-
-template <typename Container>
-std::string displayNodeSymbolContainer(const Container& set) {
-  std::stringstream ss;
-  ss << "[";
-  auto iter = set.begin();
-  while (iter != set.end()) {
-    ss << NodeSymbol(*iter).getLabel();
-    ++iter;
-    if (iter != set.end()) {
-      ss << ", ";
-    }
-  }
-  ss << "]";
-  return ss.str();
-}
+NodeSymbol operator"" _id(const char* str, size_t size);
 
 }  // namespace spark_dsg

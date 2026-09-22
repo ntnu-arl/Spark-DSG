@@ -34,11 +34,13 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
 
-#include "spark_dsg/dynamic_scene_graph.h"
+#include "spark_dsg/spark_dsg_fwd.h"
 
 namespace spark_dsg::io {
 
@@ -52,7 +54,7 @@ enum class FileType { JSON, BINARY, NONE, UNKNOWN };
  * @brief Identify the file type of a given filepath.
  * @param filepath The complete filepath to identify.
  */
-FileType identifyFileType(const std::string& filepath);
+FileType identifyFileType(const std::filesystem::path& filepath);
 
 /**
  * @brief Verify that the file extension of a given filepath is valid. If no extension
@@ -61,7 +63,7 @@ FileType identifyFileType(const std::string& filepath);
  * @throws std::runtime_error if the extension is invalid.
  * @return The file type of the resulting filepath.
  */
-FileType verifyFileExtension(std::string& filepath);
+FileType verifyFileExtension(std::filesystem::path& filepath);
 
 /**
  * @brief Save a DynamicSceneGraph to a JSON file.
@@ -70,7 +72,7 @@ FileType verifyFileExtension(std::string& filepath);
  * @param include_mesh If true, save the mesh data for each node.
  */
 void saveDsgJson(const DynamicSceneGraph& graph,
-                 const std::string& filepath,
+                 const std::filesystem::path& filepath,
                  bool include_mesh = false);
 
 /**
@@ -78,7 +80,7 @@ void saveDsgJson(const DynamicSceneGraph& graph,
  * @param filepath The filepath including extension to load from.
  * @return A pointer to the loaded graph or nullptr if loading failed.
  */
-DynamicSceneGraph::Ptr loadDsgJson(const std::string& filepath);
+std::shared_ptr<DynamicSceneGraph> loadDsgJson(const std::filesystem::path& filepath);
 
 /**
  * @brief Save a DynamicSceneGraph to a file in binary serialization.
@@ -87,7 +89,7 @@ DynamicSceneGraph::Ptr loadDsgJson(const std::string& filepath);
  * @param include_mesh If true, save the mesh data for each node.
  */
 void saveDsgBinary(const DynamicSceneGraph& graph,
-                   const std::string& filepath,
+                   const std::filesystem::path& filepath,
                    bool include_mesh = false);
 
 /**
@@ -95,6 +97,6 @@ void saveDsgBinary(const DynamicSceneGraph& graph,
  * @param filepath The filepath including extension to load from.
  * @return A pointer to the loaded graph or nullptr if loading failed.
  */
-DynamicSceneGraph::Ptr loadDsgBinary(const std::string& filepath);
+std::shared_ptr<DynamicSceneGraph> loadDsgBinary(const std::filesystem::path& filepath);
 
 }  // namespace spark_dsg::io

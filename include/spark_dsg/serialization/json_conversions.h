@@ -34,23 +34,21 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <Eigen/Core>
+#include <chrono>
 #include <nlohmann/json.hpp>
-
-#include "spark_dsg/bounding_box.h"
+#include <opencv2/core.hpp>
+#include <opencv2/imgcodecs.hpp>
 
 namespace spark_dsg {
 
-
-NLOHMANN_JSON_SERIALIZE_ENUM(BoundingBox::Type,
-                             {
-                                 {BoundingBox::Type::INVALID, "INVALID"},
-                                 {BoundingBox::Type::AABB, "AABB"},
-                                 {BoundingBox::Type::RAABB, "RAABB"},
-                                 {BoundingBox::Type::OBB, "OBB"},
-                             });
-
+struct BoundingBox;
 void to_json(nlohmann::json& j, const BoundingBox& b);
 void from_json(const nlohmann::json& j, BoundingBox& b);
+
+struct LayerKey;
+void to_json(nlohmann::json& j, const LayerKey& key);
+void from_json(const nlohmann::json& j, LayerKey& key);
 
 struct NearestVertexInfo;
 void to_json(nlohmann::json& j, const NearestVertexInfo& b);
@@ -120,7 +118,7 @@ struct adl_serializer<Eigen::Matrix<Scalar, Rows, Cols>> {
       throw std::runtime_error(ss.str());
     }
 
-    mat = Eigen::Matrix<Scalar, Rows, Cols>(rows, cols);
+    mat = Eigen::Matrix<Scalar, Rows, Cols>::Zero(rows, cols);
     for (size_t i = 0; i < vec->size(); ++i) {
       int r = i / cols;
       int c = i % cols;
@@ -142,6 +140,67 @@ struct adl_serializer<Eigen::Quaternion<Scalar>> {
                                   j.at("x").get<Scalar>(),
                                   j.at("y").get<Scalar>(),
                                   j.at("z").get<Scalar>());
+  }
+};
+
+template <>
+struct adl_serializer<cv::Mat> {
+  static void to_json(json& j, const cv::Mat& mat) {
+    if (mat.empty()) {
+      j = nullptr;
+      return;
+    }
+
+    // Safety checks (your assumption)
+    if (mat.type() != CV_8UC3) {
+      throw std::runtime_error("cv::Mat must be CV_8UC3 (RGB)");
+    }
+
+    std::vector<uint8_t> png;
+    if (!cv::imencode(".png", mat, png)) {
+      throw std::runtime_error("Failed to encode cv::Mat as PNG");
+    }
+
+    j = json{{"encoding", "png"},
+             {"rows", mat.rows},
+             {"cols", mat.cols},
+             {"data", json::binary(png)}};
+  }
+
+  static void from_json(const json& j, cv::Mat& mat) {
+    if (j.is_null()) {
+      mat.release();
+      return;
+    }
+
+    if (j.at("encoding") != "png") {
+      throw std::runtime_error("Unsupported image encoding");
+    }
+
+    const auto& bin = j.at("data").get_binary();
+    const auto* ptr = reinterpret_cast<const uint8_t*>(bin.data());
+
+    cv::Mat decoded = cv::imdecode(
+        cv::Mat(1, static_cast<int>(bin.size()), CV_8U, const_cast<uint8_t*>(ptr)),
+        cv::IMREAD_COLOR);
+
+    if (decoded.empty()) {
+      throw std::runtime_error("Failed to decode PNG image");
+    }
+
+    mat = decoded;
+  }
+};
+
+template <typename Rep, typename Period>
+struct adl_serializer<std::chrono::duration<Rep, Period>> {
+  static void to_json(json& j, const std::chrono::duration<Rep, Period>& duration) {
+    j = std::chrono::nanoseconds(duration).count();
+  }
+
+  static void from_json(const json& j, std::chrono::duration<Rep, Period>& duration) {
+    const auto stamp_ns = j.get<int64_t>();
+    duration = std::chrono::nanoseconds(stamp_ns);
   }
 };
 

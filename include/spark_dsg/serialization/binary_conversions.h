@@ -34,6 +34,7 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 #include <Eigen/Dense>
+#include <opencv2/core.hpp>
 
 #include "spark_dsg/serialization/binary_serialization.h"
 
@@ -42,6 +43,10 @@ namespace spark_dsg {
 struct BoundingBox;
 void read_binary(const serialization::BinaryDeserializer& s, BoundingBox& box);
 void write_binary(serialization::BinarySerializer& s, const BoundingBox& box);
+
+struct LayerKey;
+void read_binary(const serialization::BinaryDeserializer& s, LayerKey& key);
+void write_binary(serialization::BinarySerializer& s, const LayerKey& key);
 
 struct NearestVertexInfo;
 void read_binary(const serialization::BinaryDeserializer& s, NearestVertexInfo& info);
@@ -149,3 +154,8 @@ void read_binary(const spark_dsg::serialization::BinaryDeserializer& s,
 }
 
 }  // namespace Eigen
+
+namespace cv {
+void write_binary(spark_dsg::serialization::BinarySerializer& s, const Mat& image);
+void read_binary(const spark_dsg::serialization::BinaryDeserializer& s, Mat& image);
+}  // namespace cv

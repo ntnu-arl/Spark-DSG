@@ -34,17 +34,23 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <glog/logging.h>
+
 #include <chrono>
+#include <iostream>
 #include <list>
 #include <map>
 #include <memory>
+#include <opencv2/core/mat.hpp>
 #include <optional>
 #include <ostream>
 #include <string>
+#include <vector>
 
 #include "spark_dsg/bounding_box.h"
 #include "spark_dsg/color.h"
 #include "spark_dsg/mesh.h"
+#include "spark_dsg/metadata.h"
 #include "spark_dsg/scene_graph_types.h"
 #include "spark_dsg/serialization/attribute_registry.h"
 
@@ -105,6 +111,8 @@ struct NodeAttributes {
   virtual ~NodeAttributes() = default;
   virtual NodeAttributes::Ptr clone() const;
 
+  virtual void transform(const Eigen::Isometry3d& transform);
+
   //! Position of the node
   Eigen::Vector3d position;
   //! last time the place was updated (while active)
@@ -113,6 +121,8 @@ struct NodeAttributes {
   bool is_active;
   //! whether the node was observed by Hydra, or added as a prediction
   bool is_predicted;
+  //! Arbitrary node metadata
+  Metadata metadata;
 
   /**
    * @brief output attribute information
@@ -164,6 +174,7 @@ struct SemanticNodeAttributes : public NodeAttributes {
   SemanticNodeAttributes();
   virtual ~SemanticNodeAttributes() = default;
   NodeAttributes::Ptr clone() const override;
+  void transform(const Eigen::Isometry3d& transform) override;
 
   bool hasLabel() const;
   bool hasFeature() const;
@@ -177,7 +188,16 @@ struct SemanticNodeAttributes : public NodeAttributes {
   //! semantic label of object
   SemanticLabel semantic_label;
   //! semantic feature of object
-  Eigen::MatrixXd semantic_feature;
+  Eigen::MatrixXf semantic_feature;
+  //! Optional set of weights for each label <label_id, weight>
+  std::map<Label, float> label_weights;
+
+  virtual double featureDistance(const Eigen::VectorXf&) const {
+    throw std::logic_error("Function not implemented: " +
+                           std::string(__PRETTY_FUNCTION__));
+  }
+
+  virtual bool validFeatures() const { return false; }
 
  protected:
   std::ostream& fill_ostream(std::ostream& out) const override;
@@ -204,6 +224,7 @@ struct ObjectNodeAttributes : public SemanticNodeAttributes {
   ObjectNodeAttributes();
   virtual ~ObjectNodeAttributes() = default;
   NodeAttributes::Ptr clone() const override;
+  void transform(const Eigen::Isometry3d& transform) override;
 
   //! Mesh vertice connections
   std::list<size_t> mesh_connections;
@@ -211,6 +232,16 @@ struct ObjectNodeAttributes : public SemanticNodeAttributes {
   bool registered;
   //! rotation of object w.r.t. world (only valid when registerd)
   Eigen::Quaterniond world_R_object;
+  //! Open vocabulary feature
+  Eigen::VectorXf feature;
+  //! Number of observations used to compute the semantic feature
+  size_t num_observations;
+
+  double featureDistance(const Eigen::VectorXf& other) const override;
+
+  bool validFeatures() const override {
+    return !feature.isZero() || feature.size() > 1;
+  }
 
  protected:
   std::ostream& fill_ostream(std::ostream& out) const override;
@@ -220,6 +251,43 @@ struct ObjectNodeAttributes : public SemanticNodeAttributes {
   REGISTER_NODE_ATTRIBUTES(ObjectNodeAttributes);
 };
 
+/** Additional node attributes for real frontier nodes */
+struct GlobalFrontierNodeAttributes : public NodeAttributes {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  //! desired pointer type of node
+  using Ptr = std::unique_ptr<GlobalFrontierNodeAttributes>;
+
+  //!  Make a default set of attributes
+  GlobalFrontierNodeAttributes();
+  virtual ~GlobalFrontierNodeAttributes() = default;
+  NodeAttributes::Ptr clone() const override;
+
+  std::map<SemanticLabel, size_t> semantic_class_labels;
+  std::vector<NodeId> connected_objects;
+  NodeId connected_nav;
+  std::string nav_layer;
+  Eigen::VectorXf semantic_feature;
+  Eigen::Vector2f direction;
+  bool use_nav_as_centroid = false;
+  std::vector<Eigen::VectorXf> features;
+  std::vector<Eigen::Vector2f> feature_points;
+  std::vector<Eigen::Vector2f> frontier_points;
+  std::vector<int> row_indices;
+  std::vector<int> col_indices;
+
+  double featureDistance(const Eigen::VectorXf&) const;
+  bool validFeatures() const {
+    return !semantic_feature.isZero() || semantic_feature.size() > 1;
+  }
+
+ protected:
+  std::ostream& fill_ostream(std::ostream& out) const override;
+  void serialization_info() override;
+  bool is_equal(const NodeAttributes& other) const override;
+  // registers derived attributes
+  REGISTER_NODE_ATTRIBUTES(GlobalFrontierNodeAttributes);
+};
 /**
  * @brief Additional node attributes for a room
  * For now, a room has identical attributes to any semantic node,
@@ -237,6 +305,15 @@ struct RoomNodeAttributes : public SemanticNodeAttributes {
   NodeAttributes::Ptr clone() const override;
 
   std::map<std::string, double> semantic_class_probabilities;
+  //! Feature vector for place
+  std::vector<Eigen::VectorXf> features;
+  //! Number of times this place has been observed
+  std::vector<uint32_t> num_observations;
+  //! Label
+  std::string label;
+
+  bool validFeatures() const override;
+  double featureDistance(const Eigen::VectorXf&) const override;
 
  protected:
   std::ostream& fill_ostream(std::ostream& out) const override;
@@ -285,6 +362,7 @@ struct PlaceNodeAttributes : public SemanticNodeAttributes {
   bool real_place = true;
   bool need_cleanup = false;
   bool active_frontier = false;
+  bool anti_frontier = false;
   Eigen::Vector3d frontier_scale;
   Eigen::Quaterniond orientation;
   size_t num_frontier_voxels = 0;
@@ -362,16 +440,29 @@ struct AgentNodeAttributes : public NodeAttributes {
   using BowIdVector = Eigen::Matrix<uint32_t, Eigen::Dynamic, 1>;
 
   AgentNodeAttributes();
-  AgentNodeAttributes(const Eigen::Quaterniond& world_R_body,
+  AgentNodeAttributes(std::chrono::nanoseconds timestamp,
+                      const Eigen::Quaterniond& world_R_body,
                       const Eigen::Vector3d& world_P_body,
                       NodeId external_key);
   virtual ~AgentNodeAttributes() = default;
   NodeAttributes::Ptr clone() const override;
+  void transform(const Eigen::Isometry3d& transform) override;
 
+  std::chrono::nanoseconds timestamp;
   Eigen::Quaterniond world_R_body;
   NodeId external_key;
   BowIdVector dbow_ids;
   Eigen::VectorXf dbow_values;
+  Eigen::VectorXf image_feature;
+  cv::Mat image;
+
+  float featureDistance(const Eigen::VectorXf& other) const;
+
+  bool validFeatures() const {
+    return !image_feature.isZero() || image_feature.size() > 1;
+  }
+
+  bool validImage() const { return !image.empty(); }
 
  protected:
   std::ostream& fill_ostream(std::ostream& out) const override;
@@ -420,6 +511,67 @@ struct KhronosObjectAttributes : public ObjectNodeAttributes {
   bool is_equal(const NodeAttributes& other) const override;
   // registers derived attributes
   REGISTER_NODE_ATTRIBUTES(KhronosObjectAttributes);
+};
+
+/**
+ * @brief The traversability state of a traversability boundary.
+ */
+enum class TraversabilityState : uint8_t {
+  UNKNOWN = 0,
+  TRAVERSABLE = 1,
+  INTRAVERSABLE = 2,
+  TRAVERSED = 3
+};
+
+using TraversabilityStates = std::vector<TraversabilityState>;
+
+/**
+ * @brief Compact information to store a grid aligned traversability boundary.
+ */
+struct BoundaryInfo {
+  //! Coordinates of the boundary w.r.t. the attribute center.
+  Eigen::Vector2d min;
+  Eigen::Vector2d max;
+
+  //! Traversability states for each side of the boundary. Each side can be empty
+  //! (=UNKNOWN), a single state, or a sequence of states indicating uniform
+  //! tessellation of the boundary. The sides are ordered bottom, left, top, right.
+  //! The states per side are ordered from the lower to the higher coordinate.
+  std::array<TraversabilityStates, 4> states;
+
+  bool operator==(const BoundaryInfo& other) const;
+  bool operator!=(const BoundaryInfo& other) const { return !(*this == other); }
+};
+
+/**
+ * @brief First simple implementation of traversability places.
+ */
+struct TraversabilityNodeAttributes : public SemanticNodeAttributes {
+ public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  using Ptr = std::unique_ptr<TraversabilityNodeAttributes>;
+
+  TraversabilityNodeAttributes() = default;
+  virtual ~TraversabilityNodeAttributes() = default;
+  NodeAttributes::Ptr clone() const override;
+
+  //! Timestamps when this place was first and last observed.
+  uint64_t first_observed_ns = 0;
+  uint64_t last_observed_ns = 0;
+
+  //! Boundary information
+  BoundaryInfo boundary;
+
+  // TODO(lschmid): Reconsider in the future.
+  //! Distance to the nearest intraversable obstacle.
+  double distance = 0.0;
+
+ protected:
+  std::ostream& fill_ostream(std::ostream& out) const override;
+  void serialization_info() override;
+  bool is_equal(const NodeAttributes& other) const override;
+
+  REGISTER_NODE_ATTRIBUTES(TraversabilityNodeAttributes);
 };
 
 }  // namespace spark_dsg

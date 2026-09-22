@@ -34,6 +34,9 @@
  * -------------------------------------------------------------------------- */
 #include <gtest/gtest.h>
 #include <spark_dsg/adjacency_matrix.h>
+#include <spark_dsg/edge_attributes.h>
+#include <spark_dsg/node_attributes.h>
+#include <spark_dsg/scene_graph_layer.h>
 
 #include "spark_dsg/logging.h"
 
@@ -64,7 +67,7 @@ struct AdjacencyMatrixFixture
     layer.insertEdge(1, 3, std::make_unique<EdgeAttributes>(0.4));
   }
 
-  IsolatedSceneGraphLayer layer;
+  SceneGraphLayer layer;
 };
 
 TEST_P(AdjacencyMatrixFixture, AdjacencyMatrixCorrect) {

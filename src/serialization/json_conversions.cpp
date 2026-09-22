@@ -36,6 +36,7 @@
 
 #include <fstream>
 
+#include "spark_dsg/bounding_box.h"
 #include "spark_dsg/edge_attributes.h"
 #include "spark_dsg/logging.h"
 #include "spark_dsg/mesh.h"
@@ -46,6 +47,14 @@
 namespace spark_dsg {
 
 using nlohmann::json;
+
+NLOHMANN_JSON_SERIALIZE_ENUM(BoundingBox::Type,
+                             {
+                                 {BoundingBox::Type::INVALID, "INVALID"},
+                                 {BoundingBox::Type::AABB, "AABB"},
+                                 {BoundingBox::Type::RAABB, "RAABB"},
+                                 {BoundingBox::Type::OBB, "OBB"},
+                             });
 
 void to_json(json& j, const BoundingBox& b) {
   j = json{{"type", b.type},
@@ -78,6 +87,15 @@ void from_json(const json& j, BoundingBox& b) {
   b.world_P_center = j.at("world_P_center").get<Eigen::Vector3f>();
   auto world_q_center = j.at("world_R_center").get<Eigen::Quaternionf>();
   b.world_R_center = world_q_center.toRotationMatrix();
+}
+
+void to_json(json& j, const LayerKey& key) {
+  j = json{{"layer", key.layer}, {"partition", key.partition}};
+}
+
+void from_json(const json& j, LayerKey& key) {
+  key.layer = j.at("layer").get<LayerId>();
+  key.partition = j.at("partition").get<PartitionId>();
 }
 
 void to_json(json& j, const NearestVertexInfo& info) {
@@ -114,7 +132,7 @@ void to_json(json& record, const Color& c) {
 
 void from_json(const json& record, Color& c) {
   // Support scene graphs 1.0.2 and earlier where colors were encoded as vectors.
-  // TODO(lschmid): Remove this in the future. 
+  // TODO(lschmid): Remove this in the future.
   if (record.is_array()) {
     io::warnOutdatedHeader(io::GlobalInfo::loadedHeader());
     c.r = record.at(0).get<uint8_t>();

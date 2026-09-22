@@ -34,10 +34,12 @@
  * -------------------------------------------------------------------------- */
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
-#include <sstream>
+#include <stdexcept>
+#include <string>
 #include <type_traits>
 #include <vector>
 
